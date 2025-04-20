@@ -47,6 +47,7 @@ class KNN:
         """
         self.training_features = training_features
         self.training_labels = training_labels
+        self.distance_matrix = []
         
     def _calculate_distances(self, query_point: pd.Series) -> List[float]:
         """ Calculate distances from the query point to all training data points.
@@ -102,6 +103,12 @@ class KNN:
         Returns:
             int: The predicted class label.
         """
+        
+        if k < 1:
+            raise ValueError("Error: Value K can't have value below 1")
+        elif k > len(self.training_features):
+            raise ValueError("Error: Not enough neightbors(K value too big)")
+        
         distances = self._calculate_distances(query_point)
         nearest_neighbors = self._get_nearest_neighbors(distances, k)
         predicted_label = self._predict_label(nearest_neighbors)
@@ -152,3 +159,49 @@ class KNN:
         
         accuracy = correct_predictions / total_predictions
         return accuracy
+    
+    def generate_distance_matrix(self, data : pd.DataFrame) -> List[List[np.float64]]:
+        """ Calculate distances from the all query points in data to all training data points, and stores it
+
+        Args:
+            data (pd.DataFrame): DataFrame containing the test data points to classify.
+
+        Returns:
+            List[List[np.float64]]: Two dimentional array with distances. Example: Distance between the variable "data[0]" and "self.training_features[1]" is "self.distance_matix[0][1]"
+        """
+        for index, row in data.iterrows():
+            distance = self._calculate_distances(row)
+            self.distance_matrix.append(distance)
+            
+        return self.distance_matrix
+    
+    def get_prediction_from_distance_matrix(self, k : int, test_feature_index : int) -> int:
+        """ Get the predicted label with values in "self.distance_matrix"
+
+        Args:
+            k (int): Number of nearest neighbors to consider.
+            test_feature_index (int): Index of test_feature used to calculate distances of "self.distance_matrix"
+
+        Returns:
+            int: Predicted label
+        """
+        distances = self.distance_matrix[test_feature_index]
+        nearest_neighbors = self._get_nearest_neighbors(distances, k)
+        return self._predict_label(nearest_neighbors)
+    
+    def get_all_predictions_from_distance_matrix(self, k : int) -> List[int]:
+        """ Get all the predictions of labels from "self.distance_matrix"
+
+        Args:
+            k (int): Number of nearest neighbors to consider.
+
+        Returns:
+            List[int]: List of predicted labels
+        """
+        labels = []
+        for index in range(len(self.distance_matrix)):
+            prediction = self.get_prediction_from_distance_matrix(k, index)
+            labels.append(prediction)
+            
+        return labels
+        
