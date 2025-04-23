@@ -1,7 +1,8 @@
-import scipy.io
-import pandas as pd
 import numpy as np
-from typing import List, Union, Tuple
+import pandas as pd
+
+import scipy.io
+from typing import List, Union, Tuple, Optional
 
 def load_data(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -17,6 +18,7 @@ def load_data(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame,
     
     return train_features, train_labels, test_features, test_labels
 
+
 def euclidean_distance(row_train: np.ndarray, row_test: np.ndarray) -> float:
     """
     Calculate the Euclidean distance between two data points.
@@ -26,113 +28,7 @@ def euclidean_distance(row_train: np.ndarray, row_test: np.ndarray) -> float:
 
     return np.sqrt(np.sum((row_test - row_train)**2))
 
-def indices_of_n_smallest(array: np.ndarray, n: int) -> np.ndarray:
-    """
-    Find the indices of the n smallest values in an array.
-    """
-    # np.argsort returns the indices that would sort the array
-    indices = np.argsort(array)
-    
-    # Returns the first n indices (which correspond to the n smallest values)
-    return indices[:n]
-
-class KNN:
-    """
-    K-Nearest Neighbors (KNN) classifier implementation.
-    """
-    
-    def __init__(self, training_features: pd.DataFrame, training_labels: pd.DataFrame):
-        """
-        Initialize the KNN classifier with training data and labels.
-        """
-        self.training_features = training_features
-        self.training_labels = training_labels
-        self.distance_matrix = []
-        
-    def _calculate_distances(self, query_point: pd.Series) -> List[float]:
-        """ Calculate distances from the query point to all training data points.
-
-        Args:
-            query_point (pd.Series): The data point to calculate distances.
-
-        Returns:
-            List[float]: List of distances from the query point to each training data point.
-        """
-        distances = []
-  
-        for index, training_row in self.training_features.iterrows():
-            distance = euclidean_distance(training_row, query_point)
-            distances.append(distance)
-   
-        return distances
-    
-    def _get_nearest_neighbors(self, distances: List[float], k: int) -> pd.DataFrame:
-        """ Find the k nearest neighbors based on the distances.
-
-        Args:
-            distances (List[float]): List of distances from the query point to each training data point.
-            k (int): Number of nearest neighbors to consider.
-
-        Returns:
-            pd.DataFrame: Labels of the k nearest neighbors.
-        """
-        nearest_indices = indices_of_n_smallest(distances, k)
-        nearest_labels = self.training_labels.iloc[nearest_indices]
-        return nearest_labels
-    
-    def _predict_label(self, neighbor_labels: pd.DataFrame) -> int:
-        """ Predict the class label based on the majority vote of nearest neighbors.
-
-        Args:
-            neighbor_labels (pd.DataFrame): Labels of the nearest neighbors.
-
-        Returns:
-            int: The predicted class label.
-        """
-        values, counts = np.unique(neighbor_labels, return_counts=True)
-        most_common_index = np.argmax(counts)
-        return values[most_common_index]
-    
-    def predict(self, query_point: pd.Series, k: int) -> int:
-        """ Predict the class of a query point using k-nearest neighbors.
-
-        Args:
-            query_point (pd.Series): The data point to classify.
-            k (int): Number of nearest neighbors to consider.
-
-        Returns:
-            int: The predicted class label.
-        """
-        
-        if k < 1:
-            raise ValueError("Error: Value K can't have value below 1")
-        elif k > len(self.training_features):
-            raise ValueError("Error: Not enough neightbors(K value too big)")
-        
-        distances = self._calculate_distances(query_point)
-        nearest_neighbors = self._get_nearest_neighbors(distances, k)
-        predicted_label = self._predict_label(nearest_neighbors)
-        return predicted_label
-    
-    def predict_all(self, data : pd.DataFrame, k: int):
-        """ Predict labels for all data points in a test DataFrame.
-
-        Args:
-            data (pd.DataFrame): DataFrame containing the test data points to classify.
-            k (int): Number of nearest neighbors to consider.
-
-        Returns:
-            List[int]: Array of predicted labels for each test data point.
-        """
-        predicted_labels = []
-        
-        # For each row predict
-        for index, row in data.iterrows():
-            predicted_labels.append(self.predict(row, k))
-            
-        return predicted_labels
-    
-    def get_accuracy(self, predicted_labels: List[np.uint], true_labels: pd.DataFrame) -> float:
+def get_accuracy(predicted_labels: List[np.uint], true_labels: pd.DataFrame) -> float:
         """ Calculate the classification accuracy by comparing predicted labels with true labels.
 
         Args:
@@ -159,49 +55,84 @@ class KNN:
         
         accuracy = correct_predictions / total_predictions
         return accuracy
+
+class KNN:
     
-    def generate_distance_matrix(self, data : pd.DataFrame) -> List[List[np.float64]]:
-        """ Calculate distances from the all query points in data to all training data points, and stores it
-
-        Args:
-            data (pd.DataFrame): DataFrame containing the test data points to classify.
-
-        Returns:
-            List[List[np.float64]]: Two dimentional array with distances. Example: Distance between the variable "data[0]" and "self.training_features[1]" is "self.distance_matix[0][1]"
-        """
-        for index, row in data.iterrows():
-            distance = self._calculate_distances(row)
-            self.distance_matrix.append(distance)
-            
-        return self.distance_matrix
-    
-    def get_prediction_from_distance_matrix(self, k : int, test_feature_index : int) -> int:
-        """ Get the predicted label with values in "self.distance_matrix"
-
-        Args:
-            k (int): Number of nearest neighbors to consider.
-            test_feature_index (int): Index of test_feature used to calculate distances of "self.distance_matrix"
-
-        Returns:
-            int: Predicted label
-        """
-        distances = self.distance_matrix[test_feature_index]
-        nearest_neighbors = self._get_nearest_neighbors(distances, k)
-        return self._predict_label(nearest_neighbors)
-    
-    def get_all_predictions_from_distance_matrix(self, k : int) -> List[int]:
-        """ Get all the predictions of labels from "self.distance_matrix"
-
-        Args:
-            k (int): Number of nearest neighbors to consider.
-
-        Returns:
-            List[int]: List of predicted labels
-        """
-        labels = []
-        for index in range(len(self.distance_matrix)):
-            prediction = self.get_prediction_from_distance_matrix(k, index)
-            labels.append(prediction)
-            
-        return labels
+    def __init__(self, 
+                train_features : pd.DataFrame, 
+                train_labels : pd.DataFrame, 
+                test_features : pd.DataFrame, 
+                test_labels : pd.DataFrame,
+                columns_to_remove : Optional[List[str]] = [],
+                columns_only : Optional[List[str]] = []
+                ):
         
+        self.train_features = train_features
+        self.train_labels = train_labels
+        self.test_features = test_features
+        self.test_labels = test_labels
+        
+        if columns_to_remove:
+            self._drop_columns(columns_to_remove)
+            
+        if columns_only:
+            self._only_columns(columns_only)
+        
+        self.dist = self._generate_distance_matrix()
+        
+    def get_predictions(self, k : int) -> np.array:
+        predictions = []
+        
+        for row_dist in self.dist:
+            # Indice dos train_labels mais pertos
+            neighbors_indices = np.argsort(row_dist)[:k]
+            
+            # Valor dos vizinhos
+            neighbors = self.train_labels.iloc[neighbors_indices]
+            
+            # Valor mais comum dos vizinhos
+            pred = neighbors[0].value_counts().index[0]
+            predictions.append(pred)
+            
+        return np.array(predictions)
+    
+    def run_range_k(self, stop : int):
+        data = {
+            'k' : [],
+            'accuracy' : []
+        }
+        
+        for i in range(1, stop):
+            pred = self.get_predictions(i)
+            acc = get_accuracy(predicted_labels=pred, true_labels=self.test_labels)
+
+            data['k'].append(i)
+            data['accuracy'].append(acc)
+
+        return data
+    
+    def _only_columns(self, columns):
+        self.train_features = self.train_features[columns]
+        self.test_features = self.test_features[columns]
+    
+    def _drop_columns(self, columns : List[str]):
+        
+        for col in columns:
+            self.train_features.drop(col, axis=1, inplace=True)
+            self.test_features.drop(col, axis=1, inplace=True)
+        
+    def _generate_distance_matrix(self) -> np.array:
+        
+        dist = []
+        
+        for index_test, test_row in self.test_features.iterrows():
+            
+            row_distances = []
+            
+            for index_training, training_row in self.train_features.iterrows():
+                element_distance = euclidean_distance(training_row, test_row)
+                row_distances.append(element_distance)
+                
+            dist.append(np.array(row_distances))
+            
+        return np.array(dist)
